@@ -4,16 +4,19 @@ const path = require('path');
 const fs = require('fs');
 const Tesseract = require('tesseract.js');
 const Groq = require('groq-sdk');
+const cors = require('cors');
 const { createCanvas, loadImage } = require('canvas');
 
 const app = express();
 const port = 5000;
 
+app.use(cors());
+
 // Configure storage for multer
 const storage = multer.diskStorage({
   destination: './uploads',
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    cb(null, `${file.originalname}`);
   },
 });
 
@@ -23,29 +26,20 @@ const upload = multer({ storage });
 const groq = new Groq({ apiKey: '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' });
 
 // Function to extract text from images using Tesseract
-async function extractTextFromImage(imagePath) {
-  try {
-    const image = await loadImage(imagePath);
-
-    // Ensure the image is large enough
-    if (image.width < 100 || image.height < 100) {
-      console.warn('Image is too small for OCR processing. Skipping OCR.');
-      return 'Image too small for OCR processing.';
-    }
-
-    // Create a canvas to process the image
-    console.log(`Image width: ${image.width}    Image Height: ${image.height}`)
-    const canvas = createCanvas(image.width, image.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(image, 0, 0);
-
-    // Use Tesseract to extract text
-    const { data: { text } } = await Tesseract.recognize(canvas.toBuffer(), 'eng');
-    return text;
-  } catch (error) {
-    console.error('Error extracting text from image:', error);
-    throw error;
-  }
+function extractTextFromImage(imagePath) {
+  return new Promise((resolve, reject) => {
+    Tesseract.recognize(
+      imagePath,
+      'eng', // Specify the language here
+      {
+        logger: info => console.log(info), // Optional logger for progress updates
+      }
+    ).then(({ data: { text } }) => {
+      resolve(text);
+    }).catch(err => {
+      reject(err);
+    });
+  });
 }
 
 // Function to classify document using Groq
@@ -84,16 +78,18 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
     // Extract text from image
     const extractedText = await extractTextFromImage(filePath);
-    
+    console.log('Extracted Text:', extractedText);
+
     // Classify the document
     const classification = await classifyDocument(extractedText);
 
     // Send the classification result
-    res.status(200).json({ classification });
+    res.status(200).json({ extractedText, classification });
 
     // Clean up uploaded file
     fs.unlinkSync(filePath);
   } catch (error) {
+    console.error('Error processing file:', error);
     res.status(500).send('Error processing file');
   }
 });
