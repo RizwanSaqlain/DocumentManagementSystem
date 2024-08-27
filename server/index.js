@@ -34,6 +34,7 @@ async function extractTextFromImage(imagePath) {
     }
 
     // Create a canvas to process the image
+    console.log(`Image width: ${image.width}    Image Height: ${image.height}`)
     const canvas = createCanvas(image.width, image.height);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(image, 0, 0);
