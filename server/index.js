@@ -5,7 +5,7 @@ const fs = require('fs');
 const Tesseract = require('tesseract.js');
 const Groq = require('groq-sdk');
 const cors = require('cors');
-const { createCanvas, loadImage } = require('canvas');
+
 
 const app = express();
 const port = 5000;
