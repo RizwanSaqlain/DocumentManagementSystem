@@ -66,7 +66,7 @@ def process_document(file_path):
     return classification
 
 # Example usage
-file_path = "ClassX.pdf"  # Change to your file path
+file_path = "Class X Digilocker Verified Copy.pdf"  # Change to your file path
 result = process_document(file_path)
 ic(result)
 # print(result)

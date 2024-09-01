@@ -1,2 +1,4 @@
 node_modules/
 Test/
+server/app.py
+uploads/

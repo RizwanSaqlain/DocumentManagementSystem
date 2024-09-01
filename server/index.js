@@ -5,6 +5,9 @@ const fs = require('fs');
 const Tesseract = require('tesseract.js');
 const Groq = require('groq-sdk');
 const cors = require('cors');
+const pdfParse = require('pdf-parse');
+const { createCanvas, loadImage } = require('canvas');
+const { exec } = require('child_process'); // To run command-line tools
 
 
 const app = express();
@@ -12,11 +15,14 @@ const port = 5000;
 
 app.use(cors());
 
-// Configure storage for multer
+
+// Create an absolute path for the uploads directory
+const uploadsDir = path.resolve(__dirname, '../uploads');
+
 const storage = multer.diskStorage({
-  destination: './uploads',
+  destination: uploadsDir,
   filename: (req, file, cb) => {
-    cb(null, `${file.originalname}`);
+    cb(null, file.originalname);
   },
 });
 
@@ -24,6 +30,45 @@ const upload = multer({ storage });
 
 // Initialize Groq client with hardcoded API key
 const groq = new Groq({ apiKey: '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' });
+
+
+// Function to convert PDF to image using pdf-poppler (or another tool)
+function convertPdfToImage(pdfPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const command = `pdftoppm -png -singlefile -r 300 "${pdfPath}" "${outputPath}"`;
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        return reject(`Error converting PDF to image: ${stderr}`);
+      }
+      resolve(`${outputPath}.png`);
+    });
+  });
+}
+
+
+// Function to extract text from PDFs
+async function extractTextFromPDF(filePath) {
+  const dataBuffer = fs.readFileSync(filePath);
+  const data = await pdfParse(dataBuffer);
+  let extractedText = data.text.trim();
+
+  if (!extractedText) {
+    console.log('No text found, converting PDF to image...');
+    
+    // Convert PDF to image
+    const outputPath = path.join(__dirname, 'uploads', 'pdf_image_output');
+    const imagePath = await convertPdfToImage(filePath, outputPath);
+
+    // Extract text from the image
+    extractedText = await extractTextFromImage(imagePath);
+
+    // Clean up generated image file after processing
+    fs.unlinkSync(imagePath);
+  }
+
+  return extractedText;
+}
+
 
 // Function to extract text from images using Tesseract
 function extractTextFromImage(imagePath) {
@@ -48,8 +93,8 @@ async function classifyDocument(extractedText) {
     const chatCompletion = await groq.chat.completions.create({
       messages: [
         {
-          role: 'system',
-          content: 'Classify the document. The text is scanned using tesseract OCR. It may not be fully accurate but you just need to specify which type of document it is from this list otherwise return unknown [Marksheet, Aadhar Card, Pan Card, Character Certificate]',
+          "role": "system",
+          "content": "You are an AI document classification assistant. You will receive text extracted from a document using OCR (Optical Character Recognition). The text may contain errors or incomplete information due to the nature of OCR. Your task is to determine the most likely type of document from the following categories: [Marksheet, Aadhar Card, Pan Card, Character Certificate]. If the text does not strongly match any of these categories, respond with 'Unknown'. Provide a clear and concise classification based on the content provided."
         },
         {
           role: 'user',
@@ -69,15 +114,21 @@ async function classifyDocument(extractedText) {
 // Handle file uploads and processing
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
-    const filePath = path.join(__dirname, 'uploads', req.file.filename);
+    const filePath = path.resolve(__dirname, '../uploads', req.file.filename);
+    const fileExtension = path.extname(filePath).toLowerCase();
 
-    // Check for valid image file extensions
-    if (!['.png', '.jpg', '.jpeg'].includes(path.extname(filePath).toLowerCase())) {
-      return res.status(400).send('Unsupported file format. Please use PNG, JPG, or JPEG.');
+    let extractedText = '';
+
+    if (['.png', '.jpg', '.jpeg'].includes(fileExtension)) {
+      // Handle image files
+      extractedText = await extractTextFromImage(filePath);
+    } else if (fileExtension === '.pdf') {
+      // Handle PDF files
+      extractedText = await extractTextFromPDF(filePath);
+    } else {
+      return res.status(400).send('Unsupported file format. Please use PNG, JPG, JPEG, or PDF.');
     }
 
-    // Extract text from image
-    const extractedText = await extractTextFromImage(filePath);
     console.log('Extracted Text:', extractedText);
 
     // Classify the document
