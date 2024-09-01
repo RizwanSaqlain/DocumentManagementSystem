@@ -1,9 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 function App() {
   const [file, setFile] = useState(null);
   const [classification, setClassification] = useState(''); // State to store classification result
+
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await axios.get('http://localhost:5000/get-dummy-data');
+        setData(response.data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -32,6 +49,15 @@ function App() {
 
   return (
     <div style={{ textAlign: 'center', marginTop: '50px' }}>
+      <h1>Retrieved Data</h1>
+      <ul>
+        {data.map((item, index) => (
+          <li key={index}>
+            {item.name} - {item.candidateId}
+          </li>
+        ))}
+      </ul>
+      <ul>Random Item</ul>
       <h1>Document Upload</h1>
       <input type="file" onChange={handleFileChange} />
       <button onClick={handleUpload}>Upload</button>
@@ -44,6 +70,8 @@ function App() {
         </div>
       )}
     </div>
+
+    
   );
 }
 

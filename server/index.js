@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -8,12 +9,20 @@ const cors = require('cors');
 const pdfParse = require('pdf-parse');
 const { createCanvas, loadImage } = require('canvas');
 const { exec } = require('child_process'); // To run command-line tools
+const { PersonalDetails, FamilyIncomeDetails, AddressContactDetails } = require('./models/studentDetail.model');
 
 
 const app = express();
 const port = 5000;
 
 app.use(cors());
+app.use(express.json()); // For parsing application/json
+
+
+// MongoDB connection
+mongoose.connect('mongodb://localhost:27017/StudentDetails')
+.then(() => console.log('MongoDB connected'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 
 // Create an absolute path for the uploads directory
@@ -94,7 +103,7 @@ async function classifyDocument(extractedText) {
       messages: [
         {
           "role": "system",
-          "content": "You are an AI document classification assistant. You will receive text extracted from a document using OCR (Optical Character Recognition). The text may contain errors or incomplete information due to the nature of OCR. Your task is to determine the most likely type of document from the following categories: [Marksheet, Aadhar Card, Pan Card, Character Certificate]. If the text does not strongly match any of these categories, respond with 'Unknown'. Provide a clear and concise classification based on the content provided."
+          "content": "You are an AI document classification assistant. You will receive text extracted from a document using OCR (Optical Character Recognition). The text may contain errors or incomplete information due to the nature of OCR. Your task is to determine the most likely type of document from the following categories: <documents> [Marksheet, Aadhar Card, Pan Card, Character Certificate]</documents>. If the text does not strongly match any of these categories, respond with 'Unknown'. Provide a clear and concise classification based on the content provided, keep the responses short to one sentence."
         },
         {
           role: 'user',
@@ -144,6 +153,45 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     res.status(500).send('Error processing file');
   }
 });
+
+
+
+// Example route to add dummy data
+app.post('/add-dummy-data', async (req, res) => {
+  try {
+    const dummyData = new PersonalDetails({
+      candidateId: '12345',
+      name: 'John Doe',
+      gender: 'Male',
+      domicile: 'State A',
+      dateOfBirth: '2000-01-01',
+      casteCategory: 'General',
+      subCasteCategory: '',
+      physicallyDisabled: 'No',
+      aadharDetails: '1234-5678-9101',
+      photo: 'path/to/photo.png',
+      signature: 'path/to/signature.png'
+    });
+
+    await dummyData.save();
+    res.status(200).send('Dummy data added');
+  } catch (error) {
+    res.status(500).send('Error adding dummy data');
+  }
+});
+
+// Example route to retrieve and send dummy data
+app.get('/get-dummy-data', async (req, res) => {
+  try {
+    const data = await PersonalDetails.find();
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).send('Error retrieving data');
+  }
+});
+
+
+
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
