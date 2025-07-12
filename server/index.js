@@ -38,7 +38,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Initialize Groq client with hardcoded API key
-const groq = new Groq({ apiKey: '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' });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 
 // Function to convert PDF to image using pdf-poppler (or another tool)
